@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aisoc.fullname" . }}-config
+  labels:
+    {{- include "aisoc.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.api.env.APP_ENV | quote }}
+  CONNECTOR_MODE: {{ .Values.api.env.CONNECTOR_MODE | quote }}
+  OTEL_ENABLED: {{ .Values.api.env.OTEL_ENABLED | quote }}
+  PROMETHEUS_ENABLED: {{ .Values.api.env.PROMETHEUS_ENABLED | quote }}
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+  FRONTEND_URL: {{ .Values.config.frontendUrl | quote }}
+  JWT_ALGORITHM: {{ .Values.config.jwtAlgorithm | quote }}
+  ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.config.accessTokenExpireMinutes | quote }}
+  LLM_FALLBACK_ORDER: {{ .Values.config.llmFallbackOrder | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otelExporterOtlpEndpoint | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.config.otelServiceName | quote }}
+  QDRANT_URL: {{ .Values.qdrant.url | quote }}
+  QDRANT_COLLECTION: {{ .Values.qdrant.collection | quote }}
+  REDIS_URL: {{ printf "redis://%s:%v/0" .Values.redis.host .Values.redis.port | quote }}
+  CELERY_BROKER_URL: {{ printf "redis://%s:%v/1" .Values.redis.host .Values.redis.port | quote }}
+  CELERY_RESULT_BACKEND: {{ printf "redis://%s:%v/2" .Values.redis.host .Values.redis.port | quote }}
+  POSTGRES_HOST: {{ .Values.postgres.host | quote }}
+  POSTGRES_PORT: {{ .Values.postgres.port | quote }}
+  POSTGRES_DB: {{ .Values.postgres.database | quote }}
+  POSTGRES_USER: {{ .Values.postgres.username | quote }}
+  BACKEND_INTERNAL_URL: {{ printf "http://%s-api:%v" (include "aisoc.fullname" .) .Values.api.service.port | quote }}

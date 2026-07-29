@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (poetry / ruff / pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pip install poetry==2.1.3
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Ruff
+        run: poetry run ruff check src tests
+
+      - name: Pytest
+        env:
+          APP_ENV: test
+          SECRET_KEY: test-secret-key-at-least-32-characters-long!!
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          RATE_LIMIT_ENABLED: "false"
+          OTEL_ENABLED: "false"
+          LLM_PRIMARY_API_KEY: ""
+          CONNECTOR_MODE: mock
+        run: poetry run pytest -q
+
+  frontend:
+    name: Frontend (npm / lint / build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:8000
+
+  docker-api:
+    name: Docker build API
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        if: matrix.target == 'api'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: aisoc-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

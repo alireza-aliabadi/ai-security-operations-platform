@@ -1,0 +1,11 @@
+enable_cloud = false
+aws_region   = "us-east-1"
+name_prefix  = "aisoc-local"
+cidr_block   = "10.40.0.0/16"
+db_name      = "aisoc"
+db_username  = "aisoc"
+
+tags = {
+  Environment = "local"
+  Project     = "aisoc"
+}
