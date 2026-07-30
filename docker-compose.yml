@@ -1,0 +1,168 @@
+# AISOC local development stack
+# Password auth works without OIDC. Optional mock-oauth2-server profile: --profile oidc
+name: aisoc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aisoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aisoc_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-aisoc}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aisoc} -d ${POSTGRES_DB:-aisoc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.14.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-aisoc}:${POSTGRES_PASSWORD:-aisoc_secret}@postgres:5432/${POSTGRES_DB:-aisoc}
+      DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-aisoc}:${POSTGRES_PASSWORD:-aisoc_secret}@postgres:5432/${POSTGRES_DB:-aisoc}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      QDRANT_URL: http://qdrant:6333
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      BACKEND_INTERNAL_URL: http://api:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A aisoc.workers.celery_app worker --loglevel=info
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-aisoc}:${POSTGRES_PASSWORD:-aisoc_secret}@postgres:5432/${POSTGRES_DB:-aisoc}
+      DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-aisoc}:${POSTGRES_PASSWORD:-aisoc_secret}@postgres:5432/${POSTGRES_DB:-aisoc}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      QDRANT_URL: http://qdrant:6333
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      BACKEND_INTERNAL_URL: http://api:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      BACKEND_INTERNAL_URL: http://api:8000
+      MCP_API_TOKEN: ${MCP_API_TOKEN:-mcp-dev-token-change-me}
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8100"
+    ports:
+      - "8100:8100"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+  # Optional OIDC mock — enable with: docker compose --profile oidc up
+  # Password auth works without this service.
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.9
+    profiles: ["oidc"]
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      JSON_CONFIG: |
+        {
+          "interactiveLogin": true,
+          "httpServer": "NettyWrapper",
+          "tokenCallbacks": [
+            {
+              "issuerId": "aisoc",
+              "tokenExpiry": 3600,
+              "requestMappings": [
+                {
+                  "requestParam": "scope",
+                  "match": "openid",
+                  "claims": {
+                    "sub": "analyst@aisoc.local",
+                    "email": "analyst@aisoc.local",
+                    "preferred_username": "analyst"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+
+  # Monitoring (Prometheus, Grafana, Tempo, Loki, OTel) lives in
+  # docker-compose.observability.yml — start with `make up-obs` or
+  # `docker compose -f docker-compose.observability.yml up -d`.
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

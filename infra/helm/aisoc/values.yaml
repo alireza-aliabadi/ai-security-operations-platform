@@ -1,0 +1,131 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+api:
+  image:
+    repository: ghcr.io/aisoc/api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    APP_ENV: production
+    CONNECTOR_MODE: mock
+    OTEL_ENABLED: "true"
+    PROMETHEUS_ENABLED: "true"
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+worker:
+  image:
+    repository: ghcr.io/aisoc/api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  command:
+    - celery
+    - -A
+    - aisoc.workers.celery_app
+    - worker
+    - --loglevel=info
+
+frontend:
+  image:
+    repository: ghcr.io/aisoc/frontend
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+mcp:
+  image:
+    repository: ghcr.io/aisoc/mcp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8100
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+postgres:
+  # When true, expect an external Postgres (set connection secrets).
+  external: true
+  # When true, enable a bundled subchart (not shipped by default).
+  subchart: false
+  host: postgres
+  port: 5432
+  database: aisoc
+  username: aisoc
+
+redis:
+  external: true
+  subchart: false
+  host: redis
+  port: 6379
+
+qdrant:
+  external: true
+  subchart: false
+  url: http://qdrant:6333
+  collection: aisoc_knowledge
+
+ingress:
+  enabled: true
+  className: nginx
+  host: aisoc.local
+  tls: false
+  annotations: {}
+
+secrets:
+  # Leave empty to generate a placeholder Secret from these defaults (override in prod).
+  secretKey: "change-me-to-a-long-random-secret-key-at-least-32-chars"
+  encryptionKey: "0123456789abcdef0123456789abcdef"
+  postgresPassword: "aisoc_secret"
+  mcpApiToken: "mcp-dev-token-change-me"
+  llmPrimaryApiKey: ""
+
+config:
+  corsOrigins: '["https://aisoc.local"]'
+  frontendUrl: "https://aisoc.local"
+  jwtAlgorithm: HS256
+  accessTokenExpireMinutes: "30"
+  llmFallbackOrder: "primary,local,mock"
+  otelExporterOtlpEndpoint: "http://otel-collector:4317"
+  otelServiceName: "aisoc-api"

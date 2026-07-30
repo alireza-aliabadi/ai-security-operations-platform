@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aisoc
+  labels:
+    app.kubernetes.io/name: aisoc
+    app.kubernetes.io/part-of: aisoc
