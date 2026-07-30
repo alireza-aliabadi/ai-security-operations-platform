@@ -158,70 +158,11 @@ services:
           ]
         }
 
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --web.enable-lifecycle
-
-  grafana:
-    image: grafana/grafana:11.2.0
-    ports:
-      - "3002:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
-
-  tempo:
-    image: grafana/tempo:2.6.1
-    ports:
-      - "3200:3200"
-    volumes:
-      - ./observability/tempo/tempo.yml:/etc/tempo.yaml:ro
-      - tempo_data:/var/tempo
-    command: ["-config.file=/etc/tempo.yaml"]
-
-  loki:
-    image: grafana/loki:3.1.1
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./observability/loki/loki.yml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
-    command: ["-config.file=/etc/loki/local-config.yaml"]
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.111.0
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8889:8889"
-    volumes:
-      - ./observability/otel-collector/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro
-    depends_on:
-      - tempo
-      - loki
-      - prometheus
+  # Monitoring (Prometheus, Grafana, Tempo, Loki, OTel) lives in
+  # docker-compose.observability.yml — start with `make up-obs` or
+  # `docker compose -f docker-compose.observability.yml up -d`.
 
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
-  prometheus_data:
-  grafana_data:
-  tempo_data:
-  loki_data:

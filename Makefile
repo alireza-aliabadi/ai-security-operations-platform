@@ -1,4 +1,8 @@
-.PHONY: install test lint up down migrate seed
+.PHONY: install test lint up up-obs up-all down down-obs down-all migrate seed
+
+COMPOSE_APP := docker compose -f docker-compose.yml
+COMPOSE_OBS := docker compose -f docker-compose.observability.yml
+COMPOSE_ALL := docker compose -f docker-compose.yml -f docker-compose.observability.yml
 
 install:
 	cd backend && poetry install
@@ -14,10 +18,22 @@ lint:
 	cd frontend && npm run lint
 
 up:
-	docker compose up -d --build
+	$(COMPOSE_APP) up -d --build
+
+up-obs:
+	$(COMPOSE_OBS) up -d
+
+up-all:
+	$(COMPOSE_ALL) up -d --build
 
 down:
-	docker compose down
+	$(COMPOSE_APP) down
+
+down-obs:
+	$(COMPOSE_OBS) down
+
+down-all:
+	$(COMPOSE_ALL) down
 
 migrate:
 	cd backend && poetry run alembic upgrade head

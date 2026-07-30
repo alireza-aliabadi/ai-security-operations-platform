@@ -4,7 +4,7 @@
 
 1. Copy `.env.example` → `.env`
 2. `make install` (Poetry backend + npm frontend)
-3. `make up` for the full docker-compose stack, or run API/frontend locally
+3. `make up` for the app docker-compose stack (`make up-obs` / `make up-all` for monitoring), or run API/frontend locally
 
 ## Development
 

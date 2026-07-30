@@ -37,6 +37,10 @@ Enterprise-grade agentic SOC platform that unifies Graylog, Elasticsearch, Loki,
 cp .env.example .env
 docker compose up -d --build
 # or: make up
+
+# Optional monitoring stack (Prometheus, Grafana, Tempo, Loki, OTel):
+make up-obs
+# or everything: make up-all
 ```
 
 | Service | URL |
@@ -44,9 +48,9 @@ docker compose up -d --build
 | Frontend | http://localhost:3000 |
 | API | http://localhost:8000 |
 | MCP | http://localhost:8100 |
-| Grafana | http://localhost:3002 (`admin` / `admin`) |
-| Prometheus | http://localhost:9090 |
 | Qdrant | http://localhost:6333 |
+| Grafana (obs) | http://localhost:3002 (`admin` / `admin`) |
+| Prometheus (obs) | http://localhost:9090 |
 
 Health check: `curl http://localhost:8000/health`
 
@@ -110,7 +114,16 @@ Knowledge corpus lives under `knowledge/` (CVEs, incidents, policies, SOPs). Sta
 
 ## Observability
 
-Compose ships Prometheus, Grafana, Tempo, Loki, and the OTel collector. Configs under `observability/`. API emits Prometheus metrics and optional OTLP traces when `OTEL_ENABLED=true`.
+Monitoring services live in a separate Compose file: `docker-compose.observability.yml` (Prometheus, Grafana, Tempo, Loki, OTel collector). Configs under `observability/`. Both files use project name `aisoc` so the API can reach `otel-collector` on the shared network.
+
+```bash
+make up-obs          # monitoring only (app stack already running)
+make up-all          # app + monitoring
+make down-obs        # stop monitoring
+# or: WITH_OBS=1 ./scripts/dev-up.sh
+```
+
+API emits Prometheus metrics and optional OTLP traces when `OTEL_ENABLED=true`.
 
 ## Infrastructure
 
